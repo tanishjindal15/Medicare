@@ -3,9 +3,12 @@ const router = express.Router()
 
 const Address = require("../models/Address")
 const authMiddleware = require("../middleware/authMiddleware")
+const validateObjectId = require("../utils/validateObjectId")
+
+router.param("id", validateObjectId)
 
 /* SAVE ADDRESS */
-router.post("/", authMiddleware, async(req,res)=>{
+router.post("/", authMiddleware, async(req,res,next)=>{
 
   try{
 
@@ -22,14 +25,13 @@ router.post("/", authMiddleware, async(req,res)=>{
     res.json(address)
 
   }catch(err){
-    console.error("Address route error:", err.message)
-    res.status(500).json({ message:"Something went wrong" })
+    next(err)
   }
 
 })
 
 /* GET USER ADDRESSES */
-router.get("/", authMiddleware, async(req,res)=>{
+router.get("/", authMiddleware, async(req,res,next)=>{
 
   try{
 
@@ -40,14 +42,13 @@ router.get("/", authMiddleware, async(req,res)=>{
     res.json(addresses)
 
   }catch(err){
-    console.error("Address route error:", err.message)
-    res.status(500).json({ message:"Something went wrong" })
+    next(err)
   }
 
 })
 
 /* DELETE ADDRESS (owner only) */
-router.delete("/:id", authMiddleware, async(req,res)=>{
+router.delete("/:id", authMiddleware, async(req,res,next)=>{
 
   try{
 
@@ -63,13 +64,12 @@ router.delete("/:id", authMiddleware, async(req,res)=>{
     res.json({message:"Deleted"})
 
   }catch(err){
-    console.error("Address route error:", err.message)
-    res.status(500).json({ message:"Something went wrong" })
+    next(err)
   }
 
 })
 /* UPDATE ADDRESS (owner only) */
-router.put("/:id", authMiddleware, async(req,res)=>{
+router.put("/:id", authMiddleware, async(req,res,next)=>{
 
   try{
 
@@ -79,7 +79,7 @@ router.put("/:id", authMiddleware, async(req,res)=>{
     const updated = await Address.findOneAndUpdate(
       { _id: req.params.id, user: req.user.id },
       fields,
-      { new:true }
+      { new:true, runValidators:true }
     )
 
     if(!updated){
@@ -89,8 +89,7 @@ router.put("/:id", authMiddleware, async(req,res)=>{
     res.json(updated)
 
   }catch(err){
-    console.error("Address route error:", err.message)
-    res.status(500).json({ message:"Something went wrong" })
+    next(err)
   }
 
 })

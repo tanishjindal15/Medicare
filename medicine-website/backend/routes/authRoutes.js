@@ -95,7 +95,7 @@ router.post("/send-email-otp", otpLimiter, async (req, res) => {
    SIGNUP (OTP authoritative)
 ========================= */
 
-router.post("/signup", async (req, res) => {
+router.post("/signup", async (req, res, next) => {
 
   try {
 
@@ -132,8 +132,7 @@ router.post("/signup", async (req, res) => {
     res.json({ message: "Signup successful" })
 
   } catch (error) {
-    console.error("Auth route error:", error.message)
-    res.status(500).json({ message: "Something went wrong" })
+    next(error)
   }
 
 })
@@ -215,7 +214,7 @@ router.post("/reset-password", loginLimiter, async (req, res) => {
    LOGIN
 ========================= */
 
-router.post("/login", loginLimiter, async (req, res) => {
+router.post("/login", loginLimiter, async (req, res, next) => {
 
   const email = normalizeEmail(req.body.email)
   const { password } = req.body
@@ -248,8 +247,7 @@ router.post("/login", loginLimiter, async (req, res) => {
     })
 
   } catch (error) {
-    console.error("Auth route error:", error.message)
-    res.status(500).json({ message: "Something went wrong" })
+    next(error)
   }
 
 })

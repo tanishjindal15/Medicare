@@ -8,7 +8,7 @@ const adminMiddleware = require("../middleware/adminMiddleware")
 
 // GET ADMIN STATS
 
-router.get("/stats", authMiddleware, adminMiddleware, async(req,res)=>{
+router.get("/stats", authMiddleware, adminMiddleware, async(req,res,next)=>{
 
   try{
 
@@ -31,10 +31,7 @@ router.get("/stats", authMiddleware, adminMiddleware, async(req,res)=>{
     })
 
   }catch(err){
-
-    console.error("Admin stats error:", err.message)
-    res.status(500).json({ message:"Something went wrong" })
-
+    next(err)
   }
 
 })

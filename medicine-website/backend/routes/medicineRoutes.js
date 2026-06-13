@@ -2,12 +2,12 @@ const express = require("express")
 const router = express.Router()
 
 const Medicine = require("../models/Medicine")
-const mongoose = require("mongoose")
 const multer = require("multer")
 const path = require("path")
 const fs = require("fs")
 const authMiddleware = require("../middleware/authMiddleware")
 const adminMiddleware = require("../middleware/adminMiddleware")
+const validateObjectId = require("../utils/validateObjectId")
 
 // Best-effort delete of an uploaded image file (ignores seed paths / missing files)
 const removeUploadedImage = (imagePath) => {
@@ -41,58 +41,37 @@ const upload = multer({
   }
 })
 
+// Uniform 404 for any malformed :id
+router.param("id", validateObjectId)
+
 /* GET ALL MEDICINES */
 
-router.get("/", async(req,res)=>{
-
+router.get("/", async(req,res,next)=>{
   try{
-
     const medicines = await Medicine.find().sort({ _id: -1 })
     res.json(medicines)
-
   }catch(err){
-
-    console.error("Medicine route error:", err.message)
-    res.status(500).json({ message:"Something went wrong" })
-
+    next(err)
   }
-
 })
 
 /* GET SINGLE MEDICINE */
 
-router.get("/:id", async(req,res)=>{
-
+router.get("/:id", async(req,res,next)=>{
   try{
-
-    const { id } = req.params
-
-    // Guard against invalid ObjectIds before hitting the DB
-    if(!mongoose.Types.ObjectId.isValid(id)){
-      return res.status(404).json({ message:"Medicine not found" })
-    }
-
-    const medicine = await Medicine.findById(id)
-
+    const medicine = await Medicine.findById(req.params.id)
     if(!medicine){
       return res.status(404).json({ message:"Medicine not found" })
     }
-
     res.json(medicine)
-
   }catch(err){
-
-    console.error("Medicine route error:", err.message)
-    res.status(500).json({ message:"Something went wrong" })
-
+    next(err)
   }
-
 })
 
 /* ADD MEDICINE (IMAGE UPLOAD) */
 
-router.post("/", authMiddleware, adminMiddleware, upload.single("image"), async(req,res)=>{
-
+router.post("/", authMiddleware, adminMiddleware, upload.single("image"), async(req,res,next)=>{
   try{
 
     if(!req.file){
@@ -100,74 +79,42 @@ router.post("/", authMiddleware, adminMiddleware, upload.single("image"), async(
     }
 
     const medicine = new Medicine({
-
       name:req.body.name,
       price:req.body.price,
       category:req.body.category,
       description:req.body.description,
-
       image:`/uploads/${req.file.filename}`
-
     })
 
     await medicine.save()
-
     res.json(medicine)
 
   }catch(err){
-
-    // Clean up the just-uploaded file if the save failed
+    // Don't leave the just-uploaded file orphaned on a failed save
     if(req.file) removeUploadedImage(`/uploads/${req.file.filename}`)
-
-    if(err.code === 11000){
-      return res.status(400).json({ message:"A medicine with that name already exists" })
-    }
-
-    console.error("Add medicine error:", err.message)
-    res.status(500).json({ message:"Could not add medicine" })
-
+    next(err) // central handler maps 11000 / ValidationError -> 400
   }
-
 })
 
 /* DELETE MEDICINE */
 
-router.delete("/:id", authMiddleware, adminMiddleware, async(req,res)=>{
-
+router.delete("/:id", authMiddleware, adminMiddleware, async(req,res,next)=>{
   try{
-
-    if(!mongoose.Types.ObjectId.isValid(req.params.id)){
-      return res.status(404).json({ message:"Medicine not found" })
-    }
-
     const deleted = await Medicine.findByIdAndDelete(req.params.id)
-
     if(!deleted){
       return res.status(404).json({ message:"Medicine not found" })
     }
-
     removeUploadedImage(deleted.image) // clean up its image file
-
     res.json({message:"Medicine deleted"})
-
   }catch(err){
-
-    console.error("Medicine route error:", err.message)
-    res.status(500).json({ message:"Something went wrong" })
-
+    next(err)
   }
-
 })
 
 /* UPDATE MEDICINE */
 
-router.put("/:id", authMiddleware, adminMiddleware, upload.single("image"), async(req,res)=>{
-
+router.put("/:id", authMiddleware, adminMiddleware, upload.single("image"), async(req,res,next)=>{
   try{
-
-    if(!mongoose.Types.ObjectId.isValid(req.params.id)){
-      return res.status(404).json({ message:"Medicine not found" })
-    }
 
     const existing = await Medicine.findById(req.params.id)
     if(!existing){
@@ -191,6 +138,12 @@ router.put("/:id", authMiddleware, adminMiddleware, upload.single("image"), asyn
       {new:true, runValidators:true}
     )
 
+    // Could have been deleted by a concurrent request between the read and write
+    if(!updatedMedicine){
+      if(req.file) removeUploadedImage(`/uploads/${req.file.filename}`)
+      return res.status(404).json({ message:"Medicine not found" })
+    }
+
     // A new image replaced the old one — delete the orphaned old file
     if(req.file){
       removeUploadedImage(existing.image)
@@ -199,12 +152,10 @@ router.put("/:id", authMiddleware, adminMiddleware, upload.single("image"), asyn
     res.json(updatedMedicine)
 
   }catch(err){
-
-    console.error("Medicine route error:", err.message)
-    res.status(500).json({ message:"Something went wrong" })
-
+    // On a failed update with a new image, don't leak the upload
+    if(req.file) removeUploadedImage(`/uploads/${req.file.filename}`)
+    next(err) // central handler maps 11000 / ValidationError -> 400
   }
-
 })
 
 module.exports = router

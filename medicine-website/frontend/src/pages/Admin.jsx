@@ -89,7 +89,7 @@ function Admin(){
       resetForm()
       fetchMedicines()
     }catch(err){
-      toast(err.response?.data?.error || "Could not save medicine", "error")
+      toast(err.response?.data?.message || "Could not save medicine", "error")
     }finally{
       setSaving(false)
     }

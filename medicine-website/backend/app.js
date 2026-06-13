@@ -66,11 +66,28 @@ app.get("/", (req, res) => {
   res.send("Medicine API Running")
 })
 
-/* JSON ERROR HANDLER (catches multer errors, thrown errors, etc.) */
+/* CENTRAL JSON ERROR HANDLER
+   Routes should `next(err)` and let this map the status/message in one place. */
 app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
-  console.error("Error:", err.message)
 
-  // Only surface known, safe-to-show validation messages; never leak internals
+  // Mongoose validation (e.g. maxlength, min) -> 400 with a useful field hint
+  if (err.name === "ValidationError") {
+    const first = Object.values(err.errors || {})[0]
+    return res.status(400).json({ message: first?.message || "Invalid input" })
+  }
+
+  // Duplicate key (unique index) -> 400 telling the user which field clashed
+  if (err.code === 11000) {
+    const field = Object.keys(err.keyPattern || err.keyValue || {})[0] || "value"
+    return res.status(400).json({ message: `That ${field} is already in use.` })
+  }
+
+  // Bad ObjectId / cast
+  if (err.name === "CastError") {
+    return res.status(400).json({ message: "Invalid request" })
+  }
+
+  // Multer upload errors
   if (err.code === "LIMIT_FILE_SIZE") {
     return res.status(413).json({ message: "File too large (max 2 MB)" })
   }
@@ -78,6 +95,8 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
     return res.status(400).json({ message: err.message })
   }
 
+  // Anything else: log server-side, return generic
+  console.error("Error:", err.message)
   const status = err.status && err.status < 500 ? err.status : 500
   res.status(status).json({ message: "Something went wrong" })
 })

@@ -10,19 +10,21 @@ const jsonMedicines = require("../data/medicines.json")
  * ObjectIds) means every catalogue item is editable and deletable like any other.
  */
 const seedMedicines = async () => {
-  // Ensure the unique-name index exists before seeding
-  try { await Medicine.init() } catch { /* ignore */ }
-
-  // One-time gate: if the catalogue already has items, don't re-scan every boot
-  const count = await Medicine.estimatedDocumentCount()
-  if (count > 0) {
-    return
+  // Build the unique-name index. If it fails (e.g. an older DB already holds
+  // two same-named medicines) surface it — otherwise the duplicate guard is dead.
+  try {
+    await Medicine.init()
+  } catch (err) {
+    console.error("Medicine index build failed (duplicate names in DB?):", err.message)
   }
+
+  // Top-up seeding: insert any medicines.json entry not already present.
+  // Fast-path: an empty DB skips the per-item existence check.
+  const count = await Medicine.estimatedDocumentCount()
 
   for (const m of jsonMedicines) {
     try {
-      const exists = await Medicine.findOne({ name: m.name })
-      if (!exists) {
+      if (count === 0 || !(await Medicine.findOne({ name: m.name }))) {
         await Medicine.create({
           name: m.name,
           price: m.price,

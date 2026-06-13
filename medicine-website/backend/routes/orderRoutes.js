@@ -8,7 +8,11 @@ const User = require("../models/User")
 const Medicine = require("../models/Medicine")
 const authMiddleware = require("../middleware/authMiddleware")
 const adminMiddleware = require("../middleware/adminMiddleware")
+const validateObjectId = require("../utils/validateObjectId")
 const { sendMailSafe } = require("../config/mailer")
+
+// Uniform 404 for any malformed :id (cancel + status-update routes)
+router.param("id", validateObjectId)
 
 /* Limit how many orders a single user can place in a short window (anti-spam).
    Keyed on the authenticated user id, so shared IPs (office/college) are fine. */
@@ -48,7 +52,7 @@ const itemsTableHtml = (order) => {
       ${rows}
       <tr>
         <td style="padding:10px 0 0;font-weight:700;">Total</td>
-        <td style="padding:10px 0 0;font-weight:700;text-align:right;">&#8377;${order.total}</td>
+        <td style="padding:10px 0 0;font-weight:700;text-align:right;">&#8377;${Number(order.total) || 0}</td>
       </tr>
     </table>`
 }
@@ -140,12 +144,6 @@ const notifyAdmin = (subject, order, action, customer = {}) => {
 
 /* Build a clean HTML order-confirmation email */
 const orderEmailHtml = (order) => {
-  const rows = order.products.map(p => `
-    <tr>
-      <td style="padding:8px 0;border-bottom:1px solid #eee;">${escapeHtml(p.name)} &times; ${Number(p.qty) || 0}</td>
-      <td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right;">&#8377;${Number(p.price * p.qty) || 0}</td>
-    </tr>`).join("")
-
   const a = order.address || {}
 
   return `
@@ -156,13 +154,8 @@ const orderEmailHtml = (order) => {
     </div>
     <div style="border:1px solid #e6e9f0;border-top:none;border-radius:0 0 12px 12px;padding:24px;">
       <p>Hi ${escapeHtml(a.name) || "there"}, thanks for your order! We'll get it ready right away.</p>
-      <table style="width:100%;border-collapse:collapse;margin:16px 0;">${rows}
-        <tr>
-          <td style="padding:12px 0 0;font-weight:700;">Total</td>
-          <td style="padding:12px 0 0;font-weight:700;text-align:right;">&#8377;${Number(order.total) || 0}</td>
-        </tr>
-      </table>
-      <h4 style="margin:0 0 6px;">Delivery Address</h4>
+      ${itemsTableHtml(order)}
+      <h4 style="margin:16px 0 6px;">Delivery Address</h4>
       <p style="margin:0;color:#6b7280;">
         ${escapeHtml(a.name)}<br/>${escapeHtml(a.street)}<br/>
         ${escapeHtml(a.city)}, ${escapeHtml(a.state)} ${escapeHtml(a.pincode)}<br/>${escapeHtml(a.phone)}
@@ -177,7 +170,7 @@ const orderEmailHtml = (order) => {
 
 /* CREATE ORDER */
 
-router.post("/", authMiddleware, orderLimiter, async(req,res)=>{
+router.post("/", authMiddleware, orderLimiter, async(req,res,next)=>{
 
   try{
 
@@ -262,10 +255,7 @@ router.post("/", authMiddleware, orderLimiter, async(req,res)=>{
     })
 
   }catch(err){
-
-    console.error("Order route error:", err.message)
-    res.status(500).json({ message:"Something went wrong" })
-
+    next(err)
   }
 
 })
@@ -273,7 +263,7 @@ router.post("/", authMiddleware, orderLimiter, async(req,res)=>{
 
 /* GET USER ORDERS */
 
-router.get("/my-orders", authMiddleware, async(req,res)=>{
+router.get("/my-orders", authMiddleware, async(req,res,next)=>{
 
   try{
 
@@ -284,10 +274,7 @@ router.get("/my-orders", authMiddleware, async(req,res)=>{
     res.json(orders)
 
   }catch(err){
-
-    console.error("Order route error:", err.message)
-    res.status(500).json({ message:"Something went wrong" })
-
+    next(err)
   }
 
 })
@@ -295,13 +282,9 @@ router.get("/my-orders", authMiddleware, async(req,res)=>{
 
 /* CANCEL ORDER (USER, OWN PENDING ORDER ONLY) */
 
-router.put("/:id/cancel", authMiddleware, async(req,res)=>{
+router.put("/:id/cancel", authMiddleware, async(req,res,next)=>{
 
   try{
-
-    if(!mongoose.Types.ObjectId.isValid(req.params.id)){
-      return res.status(404).json({ message:"Order not found" })
-    }
 
     const cutoff = new Date(Date.now() - CANCEL_WINDOW_MS)
 
@@ -351,10 +334,7 @@ router.put("/:id/cancel", authMiddleware, async(req,res)=>{
     res.json(order)
 
   }catch(err){
-
-    console.error("Order route error:", err.message)
-    res.status(500).json({ message:"Something went wrong" })
-
+    next(err)
   }
 
 })
@@ -362,7 +342,7 @@ router.put("/:id/cancel", authMiddleware, async(req,res)=>{
 
 /* GET ALL ORDERS (ADMIN) */
 
-router.get("/", authMiddleware, adminMiddleware, async(req,res)=>{
+router.get("/", authMiddleware, adminMiddleware, async(req,res,next)=>{
 
   try{
 
@@ -373,10 +353,7 @@ router.get("/", authMiddleware, adminMiddleware, async(req,res)=>{
     res.json(orders)
 
   }catch(err){
-
-    console.error("Order route error:", err.message)
-    res.status(500).json({ message:"Something went wrong" })
-
+    next(err)
   }
 
 })
@@ -384,7 +361,7 @@ router.get("/", authMiddleware, adminMiddleware, async(req,res)=>{
 
 /* UPDATE ORDER STATUS */
 
-router.put("/:id", authMiddleware, adminMiddleware, async(req,res)=>{
+router.put("/:id", authMiddleware, adminMiddleware, async(req,res,next)=>{
 
   try{
 
@@ -393,10 +370,6 @@ router.put("/:id", authMiddleware, adminMiddleware, async(req,res)=>{
 
     if(!ALLOWED.includes(newStatus)){
       return res.status(400).json({ message:"Invalid status value" })
-    }
-
-    if(!mongoose.Types.ObjectId.isValid(req.params.id)){
-      return res.status(404).json({ message:"Order not found" })
     }
 
     const updateData = { status:newStatus }
@@ -451,10 +424,7 @@ router.put("/:id", authMiddleware, adminMiddleware, async(req,res)=>{
     res.json(updatedOrder)
 
   }catch(err){
-
-    console.error("Order route error:", err.message)
-    res.status(500).json({ message:"Something went wrong" })
-
+    next(err)
   }
 
 })

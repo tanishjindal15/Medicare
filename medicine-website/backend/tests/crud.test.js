@@ -99,3 +99,10 @@ test("addresses are owner-scoped (create / list / others can't delete)", async (
   const del = await request(app).delete(`/api/address/${addrId}`).set("Authorization", `Bearer ${userToken}`)
   assert.strictEqual(del.status, 200)
 })
+
+test("an over-length field is rejected with 400, not a generic 500", async () => {
+  const res = await request(app).post("/api/address")
+    .set("Authorization", `Bearer ${userToken}`)
+    .send({ name: "A".repeat(200), phone: "9876543210", street: "1 St", city: "City", state: "ST", pincode: "123456" })
+  assert.strictEqual(res.status, 400)
+})
