@@ -118,6 +118,7 @@ router.put("/:id", authMiddleware, adminMiddleware, upload.single("image"), asyn
 
     const existing = await Medicine.findById(req.params.id)
     if(!existing){
+      if(req.file) removeUploadedImage(`/uploads/${req.file.filename}`)
       return res.status(404).json({ message:"Medicine not found" })
     }
 
