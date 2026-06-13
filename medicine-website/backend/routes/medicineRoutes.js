@@ -45,9 +45,8 @@ router.get("/", async(req,res)=>{
 
   }catch(err){
 
-    res.status(500).json({
-      error:err.message
-    })
+    console.error("Medicine route error:", err.message)
+    res.status(500).json({ message:"Something went wrong" })
 
   }
 
@@ -76,7 +75,8 @@ router.get("/:id", async(req,res)=>{
 
   }catch(err){
 
-    res.status(500).json({ error:err.message })
+    console.error("Medicine route error:", err.message)
+    res.status(500).json({ message:"Something went wrong" })
 
   }
 
@@ -87,6 +87,10 @@ router.get("/:id", async(req,res)=>{
 router.post("/", authMiddleware, adminMiddleware, upload.single("image"), async(req,res)=>{
 
   try{
+
+    if(!req.file){
+      return res.status(400).json({ message:"A product image is required" })
+    }
 
     const medicine = new Medicine({
 
@@ -105,7 +109,8 @@ router.post("/", authMiddleware, adminMiddleware, upload.single("image"), async(
 
   }catch(err){
 
-    res.status(500).json({error:err.message})
+    console.error("Add medicine error:", err.message)
+    res.status(500).json({ message:"Could not add medicine" })
 
   }
 
@@ -131,7 +136,8 @@ router.delete("/:id", authMiddleware, adminMiddleware, async(req,res)=>{
 
   }catch(err){
 
-    res.status(500).json({error:err.message})
+    console.error("Medicine route error:", err.message)
+    res.status(500).json({ message:"Something went wrong" })
 
   }
 
@@ -172,7 +178,8 @@ router.put("/:id", authMiddleware, adminMiddleware, upload.single("image"), asyn
 
   }catch(err){
 
-    res.status(500).json({error:err.message})
+    console.error("Medicine route error:", err.message)
+    res.status(500).json({ message:"Something went wrong" })
 
   }
 

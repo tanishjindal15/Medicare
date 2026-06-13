@@ -132,7 +132,8 @@ router.post("/signup", async (req, res) => {
     res.json({ message: "Signup successful" })
 
   } catch (error) {
-    res.status(500).json({ error: error.message })
+    console.error("Auth route error:", error.message)
+    res.status(500).json({ message: "Something went wrong" })
   }
 
 })
@@ -247,7 +248,8 @@ router.post("/login", loginLimiter, async (req, res) => {
     })
 
   } catch (error) {
-    res.status(500).json({ error: error.message })
+    console.error("Auth route error:", error.message)
+    res.status(500).json({ message: "Something went wrong" })
   }
 
 })

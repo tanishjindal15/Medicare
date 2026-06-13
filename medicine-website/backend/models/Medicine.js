@@ -4,7 +4,8 @@ const medicineSchema = new mongoose.Schema({
 
   name:{
     type:String,
-    required:true
+    required:true,
+    maxlength:120
   },
 
   price:{
@@ -25,7 +26,8 @@ const medicineSchema = new mongoose.Schema({
 
   description:{
     type:String,
-    required:true
+    required:true,
+    maxlength:1000
   }
 
 })

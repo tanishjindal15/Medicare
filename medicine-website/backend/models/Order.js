@@ -24,12 +24,12 @@ const orderSchema = new mongoose.Schema({
   },
 
   address:{
-    name:String,
-    phone:String,
-    street:String,
-    city:String,
-    state:String,
-    pincode:String
+    name:{ type:String, maxlength:80 },
+    phone:{ type:String, maxlength:15 },
+    street:{ type:String, maxlength:200 },
+    city:{ type:String, maxlength:80 },
+    state:{ type:String, maxlength:80 },
+    pincode:{ type:String, maxlength:12 }
   },
 
   paymentMethod:{

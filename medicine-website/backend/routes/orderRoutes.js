@@ -18,18 +18,29 @@ const orderLimiter = rateLimit({
   message: { message: "You're placing orders too quickly. Please try again in a few minutes." },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user.id
+  keyGenerator: (req) => req.user.id,
+  skip: () => process.env.NODE_ENV === "test"
 })
 
 /* How long after placing an order a customer may still cancel it */
 const CANCEL_WINDOW_MS = 5 * 60 * 1000 // 5 minutes
 
+/* Escape user-supplied text before interpolating it into HTML emails,
+   so a malicious name/address can't inject markup or phishing links. */
+const escapeHtml = (str) =>
+  String(str == null ? "" : str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+
 /* Reusable HTML table listing the order's items */
 const itemsTableHtml = (order) => {
   const rows = (order.products || []).map(p => `
     <tr>
-      <td style="padding:8px 0;border-bottom:1px solid #eee;">${p.name} &times; ${p.qty}</td>
-      <td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right;">&#8377;${p.price * p.qty}</td>
+      <td style="padding:8px 0;border-bottom:1px solid #eee;">${escapeHtml(p.name)} &times; ${Number(p.qty) || 0}</td>
+      <td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right;">&#8377;${Number(p.price * p.qty) || 0}</td>
     </tr>`).join("")
 
   return `
@@ -59,9 +70,9 @@ const statusEmailHtml = (order, status) => {
       <p style="margin:6px 0 0;opacity:.9;">Order #${id}</p>
     </div>
     <div style="border:1px solid #e6e9f0;border-top:none;border-radius:0 0 12px 12px;padding:24px;">
-      <p>Hi ${order.address?.name || "there"}, ${msg}</p>
+      <p>Hi ${escapeHtml(order.address?.name) || "there"}, ${msg}</p>
       ${itemsTableHtml(order)}
-      <p style="margin:6px 0 0;color:#6b7280;">Payment: ${order.paymentMethod} &middot; ${order.paymentStatus}</p>
+      <p style="margin:6px 0 0;color:#6b7280;">Payment: ${escapeHtml(order.paymentMethod)} &middot; ${escapeHtml(order.paymentStatus)}</p>
     </div>
   </div>`
 }
@@ -78,10 +89,10 @@ const cancelEmailHtml = (order) => {
       <p style="margin:6px 0 0;opacity:.9;">Order #${id}</p>
     </div>
     <div style="border:1px solid #e6e9f0;border-top:none;border-radius:0 0 12px 12px;padding:24px;">
-      <p>Hi ${a.name || "there"}, your order <b>#${id}</b> has been cancelled as requested.</p>
+      <p>Hi ${escapeHtml(a.name) || "there"}, your order <b>#${id}</b> has been cancelled as requested.</p>
       <h4 style="margin:16px 0 0;">Cancelled items</h4>
       ${itemsTableHtml(order)}
-      <p style="margin:6px 0 0;color:#6b7280;">Payment: ${order.paymentMethod}</p>
+      <p style="margin:6px 0 0;color:#6b7280;">Payment: ${escapeHtml(order.paymentMethod)}</p>
       ${order.paymentMethod === "UPI"
         ? `<p style="margin:12px 0 0;color:#6b7280;">If you already paid online, your refund will be processed shortly.</p>`
         : ``}
@@ -100,25 +111,29 @@ const notifyAdmin = (subject, order, action, customer = {}) => {
   const id = order._id.toString().slice(-6).toUpperCase()
   const customerName = customer.name || order.address?.name || "Customer"
   const customerEmail = customer.email
+  const a = order.address || {}
+
+  // Strip quotes/newlines from the display name so it can't break the From header
+  const safeFromName = String(customerName).replace(/["\r\n]/g, "").slice(0, 80)
 
   sendMailSafe({
     // Gmail keeps the authenticated account as the sender address, but we set
     // the display name to the customer and Reply-To to their email.
-    from: `"${customerName} (Medicare order)" <${process.env.EMAIL_USER}>`,
+    from: `"${safeFromName} (Medicare order)" <${process.env.EMAIL_USER}>`,
     replyTo: customerEmail || undefined,
     to: adminEmail,
     subject,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#1f2a37;">
-        <h2 style="margin:0 0 12px;">${action}</h2>
+        <h2 style="margin:0 0 12px;">${escapeHtml(action)}</h2>
         <p style="margin:0 0 6px;"><b>Order #${id}</b></p>
-        <p style="margin:0 0 6px;">Customer: ${customerName} ${order.address?.phone ? "· " + order.address.phone : ""}</p>
-        ${customerEmail ? `<p style="margin:0 0 6px;">Email: ${customerEmail}</p>` : ""}
+        <p style="margin:0 0 6px;">Customer: ${escapeHtml(customerName)} ${a.phone ? "· " + escapeHtml(a.phone) : ""}</p>
+        ${customerEmail ? `<p style="margin:0 0 6px;">Email: ${escapeHtml(customerEmail)}</p>` : ""}
         <h4 style="margin:14px 0 0;">Items</h4>
         ${itemsTableHtml(order)}
-        <p style="margin:6px 0 6px;">Payment: ${order.paymentMethod}${order.paymentRef ? " · Ref: " + order.paymentRef : ""}</p>
-        ${order.address?.street ? `<p style="margin:0 0 6px;color:#6b7280;">Deliver to: ${order.address.street}, ${order.address.city || ""} ${order.address.pincode || ""}</p>` : ""}
-        <p style="margin:0;color:#6b7280;">Status: ${order.status}</p>
+        <p style="margin:6px 0 6px;">Payment: ${escapeHtml(order.paymentMethod)}${order.paymentRef ? " · Ref: " + escapeHtml(order.paymentRef) : ""}</p>
+        ${a.street ? `<p style="margin:0 0 6px;color:#6b7280;">Deliver to: ${escapeHtml(a.street)}, ${escapeHtml(a.city)} ${escapeHtml(a.pincode)}</p>` : ""}
+        <p style="margin:0;color:#6b7280;">Status: ${escapeHtml(order.status)}</p>
       </div>`
   })
 }
@@ -127,8 +142,8 @@ const notifyAdmin = (subject, order, action, customer = {}) => {
 const orderEmailHtml = (order) => {
   const rows = order.products.map(p => `
     <tr>
-      <td style="padding:8px 0;border-bottom:1px solid #eee;">${p.name} &times; ${p.qty}</td>
-      <td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right;">&#8377;${p.price * p.qty}</td>
+      <td style="padding:8px 0;border-bottom:1px solid #eee;">${escapeHtml(p.name)} &times; ${Number(p.qty) || 0}</td>
+      <td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right;">&#8377;${Number(p.price * p.qty) || 0}</td>
     </tr>`).join("")
 
   const a = order.address || {}
@@ -140,20 +155,20 @@ const orderEmailHtml = (order) => {
       <p style="margin:6px 0 0;opacity:.9;">Order #${order._id.toString().slice(-6).toUpperCase()}</p>
     </div>
     <div style="border:1px solid #e6e9f0;border-top:none;border-radius:0 0 12px 12px;padding:24px;">
-      <p>Hi ${a.name || "there"}, thanks for your order! We'll get it ready right away.</p>
+      <p>Hi ${escapeHtml(a.name) || "there"}, thanks for your order! We'll get it ready right away.</p>
       <table style="width:100%;border-collapse:collapse;margin:16px 0;">${rows}
         <tr>
           <td style="padding:12px 0 0;font-weight:700;">Total</td>
-          <td style="padding:12px 0 0;font-weight:700;text-align:right;">&#8377;${order.total}</td>
+          <td style="padding:12px 0 0;font-weight:700;text-align:right;">&#8377;${Number(order.total) || 0}</td>
         </tr>
       </table>
       <h4 style="margin:0 0 6px;">Delivery Address</h4>
       <p style="margin:0;color:#6b7280;">
-        ${a.name || ""}<br/>${a.street || ""}<br/>
-        ${a.city || ""}, ${a.state || ""} ${a.pincode || ""}<br/>${a.phone || ""}
+        ${escapeHtml(a.name)}<br/>${escapeHtml(a.street)}<br/>
+        ${escapeHtml(a.city)}, ${escapeHtml(a.state)} ${escapeHtml(a.pincode)}<br/>${escapeHtml(a.phone)}
       </p>
       <p style="margin:18px 0 0;color:#6b7280;font-size:13px;">
-        Payment: ${order.paymentMethod} &middot; Status: ${order.status}
+        Payment: ${escapeHtml(order.paymentMethod)} &middot; Status: ${escapeHtml(order.status)}
       </p>
     </div>
   </div>`
@@ -248,9 +263,8 @@ router.post("/", authMiddleware, orderLimiter, async(req,res)=>{
 
   }catch(err){
 
-    res.status(500).json({
-      error:err.message
-    })
+    console.error("Order route error:", err.message)
+    res.status(500).json({ message:"Something went wrong" })
 
   }
 
@@ -271,9 +285,8 @@ router.get("/my-orders", authMiddleware, async(req,res)=>{
 
   }catch(err){
 
-    res.status(500).json({
-      error:err.message
-    })
+    console.error("Order route error:", err.message)
+    res.status(500).json({ message:"Something went wrong" })
 
   }
 
@@ -339,9 +352,8 @@ router.put("/:id/cancel", authMiddleware, async(req,res)=>{
 
   }catch(err){
 
-    res.status(500).json({
-      error:err.message
-    })
+    console.error("Order route error:", err.message)
+    res.status(500).json({ message:"Something went wrong" })
 
   }
 
@@ -362,9 +374,8 @@ router.get("/", authMiddleware, adminMiddleware, async(req,res)=>{
 
   }catch(err){
 
-    res.status(500).json({
-      error:err.message
-    })
+    console.error("Order route error:", err.message)
+    res.status(500).json({ message:"Something went wrong" })
 
   }
 
@@ -441,9 +452,8 @@ router.put("/:id", authMiddleware, adminMiddleware, async(req,res)=>{
 
   }catch(err){
 
-    res.status(500).json({
-      error:err.message
-    })
+    console.error("Order route error:", err.message)
+    res.status(500).json({ message:"Something went wrong" })
 
   }
 

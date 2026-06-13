@@ -22,7 +22,8 @@ router.post("/", authMiddleware, async(req,res)=>{
     res.json(address)
 
   }catch(err){
-    res.status(500).json({error:err.message})
+    console.error("Address route error:", err.message)
+    res.status(500).json({ message:"Something went wrong" })
   }
 
 })
@@ -39,7 +40,8 @@ router.get("/", authMiddleware, async(req,res)=>{
     res.json(addresses)
 
   }catch(err){
-    res.status(500).json({error:err.message})
+    console.error("Address route error:", err.message)
+    res.status(500).json({ message:"Something went wrong" })
   }
 
 })
@@ -61,7 +63,8 @@ router.delete("/:id", authMiddleware, async(req,res)=>{
     res.json({message:"Deleted"})
 
   }catch(err){
-    res.status(500).json({error:err.message})
+    console.error("Address route error:", err.message)
+    res.status(500).json({ message:"Something went wrong" })
   }
 
 })
@@ -86,7 +89,8 @@ router.put("/:id", authMiddleware, async(req,res)=>{
     res.json(updated)
 
   }catch(err){
-    res.status(500).json({error:err.message})
+    console.error("Address route error:", err.message)
+    res.status(500).json({ message:"Something went wrong" })
   }
 
 })

@@ -58,8 +58,17 @@ app.get("/", (req, res) => {
 /* JSON ERROR HANDLER (catches multer errors, thrown errors, etc.) */
 app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
   console.error("Error:", err.message)
-  const status = err.status || (err.code === "LIMIT_FILE_SIZE" ? 413 : 400)
-  res.status(status).json({ message: err.message || "Something went wrong" })
+
+  // Only surface known, safe-to-show validation messages; never leak internals
+  if (err.code === "LIMIT_FILE_SIZE") {
+    return res.status(413).json({ message: "File too large (max 2 MB)" })
+  }
+  if (err.message && /only image files/i.test(err.message)) {
+    return res.status(400).json({ message: err.message })
+  }
+
+  const status = err.status && err.status < 500 ? err.status : 500
+  res.status(status).json({ message: "Something went wrong" })
 })
 
 module.exports = app

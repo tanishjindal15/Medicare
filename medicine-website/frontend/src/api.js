@@ -18,6 +18,22 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// On 401 (expired / invalid token) clear auth and send the user to login,
+// so the UI never gets stuck looking "logged in" while every call fails.
+const AUTH_KEYS = ["token", "name", "role", "userId", "email", "phone"]
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401 && localStorage.getItem("token")) {
+      AUTH_KEYS.forEach((k) => localStorage.removeItem(k))
+      if (!window.location.pathname.startsWith("/login")) {
+        window.location.assign("/login")
+      }
+    }
+    return Promise.reject(err)
+  }
+)
+
 // Helper for building image URLs served from the backend's /uploads folder.
 export const imageUrl = (path) => (path ? `${API_BASE}${path}` : "")
 
