@@ -5,8 +5,15 @@ const Medicine = require("../models/Medicine")
 const mongoose = require("mongoose")
 const multer = require("multer")
 const path = require("path")
+const fs = require("fs")
 const authMiddleware = require("../middleware/authMiddleware")
 const adminMiddleware = require("../middleware/adminMiddleware")
+
+// Best-effort delete of an uploaded image file (ignores seed paths / missing files)
+const removeUploadedImage = (imagePath) => {
+  if (!imagePath || !imagePath.startsWith("/uploads/")) return
+  fs.unlink(path.join(__dirname, "..", imagePath), () => {})
+}
 
 /* MULTER STORAGE CONFIG */
 
@@ -109,6 +116,13 @@ router.post("/", authMiddleware, adminMiddleware, upload.single("image"), async(
 
   }catch(err){
 
+    // Clean up the just-uploaded file if the save failed
+    if(req.file) removeUploadedImage(`/uploads/${req.file.filename}`)
+
+    if(err.code === 11000){
+      return res.status(400).json({ message:"A medicine with that name already exists" })
+    }
+
     console.error("Add medicine error:", err.message)
     res.status(500).json({ message:"Could not add medicine" })
 
@@ -132,6 +146,8 @@ router.delete("/:id", authMiddleware, adminMiddleware, async(req,res)=>{
       return res.status(404).json({ message:"Medicine not found" })
     }
 
+    removeUploadedImage(deleted.image) // clean up its image file
+
     res.json({message:"Medicine deleted"})
 
   }catch(err){
@@ -153,6 +169,11 @@ router.put("/:id", authMiddleware, adminMiddleware, upload.single("image"), asyn
       return res.status(404).json({ message:"Medicine not found" })
     }
 
+    const existing = await Medicine.findById(req.params.id)
+    if(!existing){
+      return res.status(404).json({ message:"Medicine not found" })
+    }
+
     const updateData = {
       name:req.body.name,
       price:req.body.price,
@@ -170,8 +191,9 @@ router.put("/:id", authMiddleware, adminMiddleware, upload.single("image"), asyn
       {new:true, runValidators:true}
     )
 
-    if(!updatedMedicine){
-      return res.status(404).json({ message:"Medicine not found" })
+    // A new image replaced the old one — delete the orphaned old file
+    if(req.file){
+      removeUploadedImage(existing.image)
     }
 
     res.json(updatedMedicine)

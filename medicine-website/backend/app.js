@@ -43,6 +43,17 @@ app.use(cors({
 
 app.use(express.json())
 
+/* Lightweight request logging (method, path, status, duration); off in tests */
+if (process.env.NODE_ENV !== "test") {
+  app.use((req, res, next) => {
+    const start = Date.now()
+    res.on("finish", () => {
+      console.log(`${req.method} ${req.originalUrl} ${res.statusCode} ${Date.now() - start}ms`)
+    })
+    next()
+  })
+}
+
 /* ROUTES */
 app.use("/api/auth", authRoutes)
 app.use("/api/medicines", medicineRoutes)
