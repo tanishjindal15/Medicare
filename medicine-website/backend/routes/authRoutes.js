@@ -11,13 +11,17 @@ const { isValidEmail, isValidPhone, isValidPassword, isNonEmpty, normalizeEmail 
 
 /* RATE LIMITERS */
 
+// Skip rate limiting in the test environment (so tests aren't throttled)
+const skipInTest = () => process.env.NODE_ENV === "test"
+
 // Login / OTP-verify / password-reset attempts: 10 per 15 min per IP
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   message: { message: "Too many attempts, please try again later" },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  skip: skipInTest
 })
 
 // OTP / email sending: 5 per 15 min per IP (prevents email spam)
@@ -26,7 +30,8 @@ const otpLimiter = rateLimit({
   max: 5,
   message: { message: "Too many requests, please try again later" },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  skip: skipInTest
 })
 
 /* OTP STORE (in-memory; fine for a single instance) */
