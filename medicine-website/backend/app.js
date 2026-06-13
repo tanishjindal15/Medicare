@@ -32,7 +32,10 @@ app.use(cors({
     if (!origin) return cb(null, true)                              // curl / mobile apps / server-to-server
     if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return cb(null, true)  // any localhost port (dev)
     if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return cb(null, true)
-    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) return cb(null, true)
+    if (allowedOrigins.includes(origin)) return cb(null, true)
+    // No production allowlist configured: allow in dev, but fail closed in production
+    // so a forgotten CLIENT_URL never reflects arbitrary origins with credentials.
+    if (allowedOrigins.length === 0 && process.env.NODE_ENV !== "production") return cb(null, true)
     return cb(new Error(`CORS: origin ${origin} not allowed`))
   },
   credentials: true

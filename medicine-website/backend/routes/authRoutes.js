@@ -301,7 +301,7 @@ router.put("/update-profile", authMiddleware, async (req, res) => {
       userId,
       { name, phone },
       { new: true, runValidators: true }
-    )
+    ).select("-password") // never return the password hash to the client
 
     res.json({ message: "Profile updated", user })
 

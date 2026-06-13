@@ -9,9 +9,12 @@ router.post("/", authMiddleware, async(req,res)=>{
 
   try{
 
+    // Strip any client-sent `user` so the owner can't be spoofed via mass assignment
+    const { user, ...fields } = req.body
+
     const address = new Address({
       user:req.user.id,
-      ...req.body
+      ...fields
     })
 
     await address.save()
