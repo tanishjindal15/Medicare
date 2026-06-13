@@ -1,25 +1,28 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom"
-import { useState } from "react"
+import { useState, lazy, Suspense } from "react"
 
+// Small layout pieces stay eager (they show on every page)
 import Navbar from "./components/Navbar"
-import Home from "./pages/Home"
-import Login from "./pages/Login"
-import Signup from "./pages/Signup"
-import Cart from "./pages/Cart"
-import Checkout from "./pages/Checkout"
-import Admin from "./pages/Admin"
 import AdminRoute from "./components/AdminRoute"
 import ProtectedRoute from "./components/ProtectedRoute"
 import AnnouncementBar from "./components/AnnouncementBar"
-import MedicineDetails from "./pages/MedicineDetails"
-import Orders from "./pages/Orders"
-import AdminOrders from "./pages/AdminOrders"
-import ForgotPassword from "./pages/ForgotPassword"
-import DeleteAccount from "./pages/DeleteAccount"
-import Profile from "./pages/Profile"   // ✅ IMPORTANT
-import NotFound from "./pages/NotFound"
-import Wishlist from "./pages/Wishlist"
 import ScrollToTop from "./components/ScrollToTop"
+
+// Pages are code-split so each route loads only when visited
+const Home = lazy(() => import("./pages/Home"))
+const Login = lazy(() => import("./pages/Login"))
+const Signup = lazy(() => import("./pages/Signup"))
+const Cart = lazy(() => import("./pages/Cart"))
+const Checkout = lazy(() => import("./pages/Checkout"))
+const Admin = lazy(() => import("./pages/Admin"))
+const MedicineDetails = lazy(() => import("./pages/MedicineDetails"))
+const Orders = lazy(() => import("./pages/Orders"))
+const AdminOrders = lazy(() => import("./pages/AdminOrders"))
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"))
+const DeleteAccount = lazy(() => import("./pages/DeleteAccount"))
+const Profile = lazy(() => import("./pages/Profile"))
+const NotFound = lazy(() => import("./pages/NotFound"))
+const Wishlist = lazy(() => import("./pages/Wishlist"))
 
 function App() {
 
@@ -31,6 +34,7 @@ function App() {
 
       <a href="#main" className="skip-link">Skip to content</a>
 
+      <Suspense fallback={<div className="route-loading">Loading…</div>}>
       <Routes>
 
         {/* HOME */}
@@ -181,6 +185,7 @@ function App() {
         />
 
       </Routes>
+      </Suspense>
 
       <ScrollToTop />
 

@@ -2773,6 +2773,14 @@ button, a, .input, select{ transition:var(--transition); }
 /* Disabled buttons read as disabled */
 button:disabled{ opacity:0.65; cursor:not-allowed; }
 
+/* ---------- Lazy route loading fallback ---------- */
+.route-loading{
+  text-align:center;
+  padding:80px 20px;
+  color:var(--muted);
+  font-size:15px;
+}
+
 /* ---------- Error boundary fallback ---------- */
 .errorboundary{
   max-width:480px;

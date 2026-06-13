@@ -34,11 +34,11 @@ app.use(cors({
     if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return cb(null, true)
     if (allowedOrigins.includes(origin)) return cb(null, true)
     // No production allowlist configured: allow in dev, but fail closed in production
-    // so a forgotten CLIENT_URL never reflects arbitrary origins with credentials.
+    // so a forgotten CLIENT_URL never reflects arbitrary origins.
     if (allowedOrigins.length === 0 && process.env.NODE_ENV !== "production") return cb(null, true)
     return cb(new Error(`CORS: origin ${origin} not allowed`))
-  },
-  credentials: true
+  }
+  // No `credentials` — auth uses the Authorization header, not cookies
 }))
 
 app.use(express.json())

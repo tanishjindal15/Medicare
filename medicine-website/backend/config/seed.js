@@ -13,6 +13,12 @@ const seedMedicines = async () => {
   // Ensure the unique-name index exists before seeding
   try { await Medicine.init() } catch { /* ignore */ }
 
+  // One-time gate: if the catalogue already has items, don't re-scan every boot
+  const count = await Medicine.estimatedDocumentCount()
+  if (count > 0) {
+    return
+  }
+
   for (const m of jsonMedicines) {
     try {
       const exists = await Medicine.findOne({ name: m.name })
