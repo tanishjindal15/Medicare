@@ -1,0 +1,7 @@
+node_modules/
+.env
+*.log
+
+# Uploaded files are runtime data, not source (move to cloud storage in prod)
+uploads/
+!uploads/.gitkeep

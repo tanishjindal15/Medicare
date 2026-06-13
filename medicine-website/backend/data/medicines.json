@@ -1,0 +1,18 @@
+[
+  {
+    "_id": "1",
+    "name": "Paracetamol",
+    "price": 20,
+    "category": "Fever",
+    "description": "Used for fever and pain relief",
+    "image": "/uploads/paracetamol.jpg"
+  },
+  {
+    "_id": "2",
+    "name": "Crocin",
+    "price": 30,
+    "category": "Pain",
+    "description": "Relieves headache and body pain",
+    "image": "/uploads/crocin.jpg"
+  }
+]
